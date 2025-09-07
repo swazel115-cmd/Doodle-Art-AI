@@ -136,13 +136,11 @@
         const drawPlaceholder = document.getElementById('drawPlaceholder');
         const downloadDrawBtn = document.getElementById('downloadDrawBtn');
 
-        const API_KEY = "";
-        const GENERATE_TEXT_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
-        const ANALYZE_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
-        const GENERATE_DRAWING_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${API_KEY}`;
-        const GENERATE_TEXT_IMAGE_MODEL = "imagen-3.0-generate-002";
-        const ANALYZE_IMAGE_MODEL = "gemini-2.5-flash-preview-05-20";
-        const GENERATE_DRAWING_IMAGE_MODEL = "gemini-2.5-flash-image-preview";
+        // Note: The API_KEY variable has been removed.
+        // The URLs now point to our own server endpoints.
+        const GENERATE_TEXT_IMAGE_URL = `/api/generate-text-image`;
+        const ANALYZE_IMAGE_URL = `/api/analyze-image`;
+        const GENERATE_DRAWING_IMAGE_URL = `/api/generate-drawing-image`;
 
         async function fetchWithBackoff(url, options, retries = MAX_RETRIES, delay = INITIAL_DELAY) {
             try {
@@ -201,10 +199,7 @@
             downloadTextBtn.classList.add('hidden');
 
             try {
-                const payload = { 
-                    instances: [{ prompt: prompt }], 
-                    parameters: { "sampleCount": 1} 
-                };
+                const payload = { prompt: prompt };
                 
                 const result = await fetchWithBackoff(GENERATE_TEXT_IMAGE_URL, {
                     method: 'POST',
@@ -328,15 +323,8 @@
             const base64Data = imageDataUrl.split(',')[1];
 
             try {
-                const analysisPayload = {
-                    contents: [{
-                        role: "user",
-                        parts: [
-                            { text: "Describe this drawing. The description will be used to generate a new image, so be detailed and creative." },
-                            { inlineData: { mimeType: "image/png", data: base64Data } }
-                        ]
-                    }],
-                };
+                // First, analyze the drawing to get a text description
+                const analysisPayload = { base64Data: base64Data };
 
                 const analysisResult = await fetchWithBackoff(ANALYZE_IMAGE_URL, {
                     method: 'POST',
@@ -349,19 +337,13 @@
                 if (candidate && candidate.content?.parts?.[0]?.text) {
                     description = candidate.content.parts[0].text;
                 }
+
                 descriptionText.innerText = description;
                 
                 descriptionText.innerText += "\n\nGenerating a new image...";
                 
-                const generationPayload = {
-                    contents: [{
-                        parts: [{ text: description }]
-                    }],
-                    generationConfig: {
-                        responseModalities: ['TEXT', 'IMAGE']
-                    },
-                    model: GENERATE_DRAWING_IMAGE_MODEL
-                };
+                // Then, generate an image from the description
+                const generationPayload = { description: description };
 
                 const generationResult = await fetchWithBackoff(GENERATE_DRAWING_IMAGE_URL, {
                     method: 'POST',
@@ -369,10 +351,8 @@
                     body: JSON.stringify(generationPayload)
                 });
                 
-                const generatedBase64Data = generationResult?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-
-                if (generatedBase64Data) {
-                    const imageUrl = `data:image/png;base64,${generatedBase64Data}`;
+                if (generationResult && generationResult.base64Data) {
+                    const imageUrl = `data:image/png;base64,${generationResult.base64Data}`;
                     drawImage.src = imageUrl;
                     drawImage.classList.remove('hidden');
                     downloadDrawBtn.classList.remove('hidden');
@@ -397,4 +377,3 @@
 
 </body>
 </html>
-
