@@ -483,9 +483,9 @@
         registerBtn.addEventListener('click', () => showSection('registerForm'));
         dashboardBtn.addEventListener('click', () => showSection('dashboard'));
         premiumBtn.addEventListener('click', () => {
-          showSection('dashboard');
-          premiumSection.classList.remove('hidden');
-          document.getElementById('premium-section').scrollIntoView({ behavior: 'smooth' });
+            showSection('dashboard');
+            premiumSection.classList.remove('hidden');
+            document.getElementById('premium-section').scrollIntoView({ behavior: 'smooth' });
         });
         logoutBtn.addEventListener('click', async () => {
             try {
@@ -552,11 +552,11 @@
                     <p class="text-sm text-yellow-700 mb-4">Upload a doodle, and the AI will analyze it, describe it in detail, and then use that description to draw a new, polished image!</p>
                     <div class="flex flex-col gap-4 items-center">
                         <input type="file" id="uploadInput" accept="image/png, image/jpeg" class="block w-full text-sm text-gray-500
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-full file:border-0
-                          file:text-sm file:font-semibold
-                          file:bg-indigo-50 file:text-indigo-700
-                          hover:file:bg-indigo-100" />
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-full file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-indigo-50 file:text-indigo-700
+                            hover:file:bg-indigo-100" />
                         <button id="describeAndDrawBtn" class="w-full p-3 font-semibold text-white bg-yellow-600 rounded-lg shadow-md hover:bg-yellow-700 transition-colors duration-300">Describe & Draw</button>
                     </div>
                     <div id="premiumGenerationStatus" class="status mt-4 hidden justify-center items-center font-bold text-lg text-gray-600"></div>
@@ -568,20 +568,18 @@
                 <div id="history-section" class="hidden mt-8 text-left">
                     <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Generation History</h2>
                     <p id="history-status" class="text-center text-gray-500 italic"></p>
-                    <div id="history-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <!-- History items will be rendered here -->
+                    <div id="history-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                     </div>
                 </div>
             </div>
         </main>
-        
-        <footer class="mt-8 text-center text-gray-500 text-sm">
-            <p>&copy; 2025 Doodle Art AI. All rights reserved.</p>
-        </footer>
-
-        <div id="message-box" class="message-box">
-            <p id="message-text"></p>
-        </div>
     </div>
+
+    <!-- Message Box -->
+    <div id="message-box" class="message-box">
+        <span id="message-text"></span>
+    </div>
+
 </body>
 </html>
+
