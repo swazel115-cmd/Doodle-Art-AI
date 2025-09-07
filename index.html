@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Image Studio</title>
+    <title>Doodle Art AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
@@ -52,7 +52,7 @@
 
     <div class="container mx-auto space-y-8">
         <header class="text-center mb-12">
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-2">AI Image Studio</h1>
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-2">Doodle Art AI</h1>
             <p class="text-lg text-gray-600">Explore creativity with two different AI-powered generators.</p>
         </header>
 
@@ -69,8 +69,9 @@
                     </button>
                 </div>
             </div>
-            <div id="textResultContainer" class="mt-8 w-full max-w-3xl flex items-center justify-center min-h-[300px]">
+            <div id="textResultContainer" class="mt-8 w-full max-w-3xl flex flex-col items-center justify-center min-h-[300px]">
                 <img id="textImage" class="rounded-2xl max-w-full max-h-[600px] hidden" alt="Generated Image">
+                <button id="downloadTextBtn" class="btn btn-secondary mt-4 hidden">Save Image</button>
                 <p id="textPlaceholder" class="text-gray-400 text-center">Your generated image will appear here.</p>
             </div>
         </div>
@@ -101,8 +102,9 @@
                     
                     <div class="mt-8 w-full">
                         <h3 class="font-semibold text-xl text-gray-700 mb-2">Generated Image:</h3>
-                        <div id="drawResultContainer" class="flex items-center justify-center min-h-[300px]">
+                        <div id="drawResultContainer" class="flex flex-col items-center justify-center min-h-[300px]">
                             <img id="drawImage" class="rounded-2xl max-w-full max-h-[600px] hidden" alt="Generated Image">
+                            <button id="downloadDrawBtn" class="btn btn-secondary mt-4 hidden">Save Image</button>
                             <p id="drawPlaceholder" class="text-gray-400 text-center">The generated image from your drawing will appear here.</p>
                         </div>
                     </div>
@@ -124,6 +126,7 @@
         const textSpinner = document.getElementById('textSpinner');
         const textImage = document.getElementById('textImage');
         const textPlaceholder = document.getElementById('textPlaceholder');
+        const downloadTextBtn = document.getElementById('downloadTextBtn');
 
         const drawingCanvas = document.getElementById('drawingCanvas');
         const ctx = drawingCanvas.getContext('2d');
@@ -133,8 +136,9 @@
         const descriptionText = document.getElementById('descriptionText');
         const drawImage = document.getElementById('drawImage');
         const drawPlaceholder = document.getElementById('drawPlaceholder');
+        const downloadDrawBtn = document.getElementById('downloadDrawBtn');
 
-        const API_KEY = ""; // This will be provided by the runtime
+        const API_KEY = "AIzaSyDef8QFiN7TI8P-uZNBd8lDyYRtjOfvMD8"; // This will be provided by the runtime
         const TEXT_TO_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
         const IMAGE_TO_TEXT_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
         const GENERATE_IMAGE_MODEL = "imagen-3.0-generate-002";
@@ -162,6 +166,25 @@
             }
         }
 
+        // --- Utility function to download an image ---
+        function downloadImage(imageElement, filename) {
+            const link = document.createElement('a');
+            link.href = imageElement.src;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- Event listeners for download buttons ---
+        downloadTextBtn.addEventListener('click', () => {
+            downloadImage(textImage, 'ai-generated-text-image.png');
+        });
+        downloadDrawBtn.addEventListener('click', () => {
+            downloadImage(drawImage, 'ai-generated-drawing-image.png');
+        });
+
+
         // --- Text-to-Image Logic ---
         generateBtn.addEventListener('click', async () => {
             if (isGenerating) return;
@@ -177,6 +200,7 @@
             textSpinner.classList.remove('hidden');
             textPlaceholder.classList.add('hidden');
             textImage.classList.add('hidden');
+            downloadTextBtn.classList.add('hidden');
 
             try {
                 const payload = {
@@ -194,6 +218,7 @@
                     const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
                     textImage.src = imageUrl;
                     textImage.classList.remove('hidden');
+                    downloadTextBtn.classList.remove('hidden');
                 } else {
                     textPlaceholder.innerText = "Could not generate image. Please try a different prompt.";
                     textPlaceholder.classList.remove('hidden');
@@ -288,6 +313,7 @@
             descriptionText.innerText = "Description will appear here after analysis...";
             drawImage.classList.add('hidden');
             drawPlaceholder.classList.remove('hidden');
+            downloadDrawBtn.classList.add('hidden');
         });
         
         // --- Drawing Analyzer & Generator Logic ---
@@ -300,6 +326,7 @@
             descriptionText.innerText = "Analyzing your drawing...";
             drawPlaceholder.classList.add('hidden');
             drawImage.classList.add('hidden');
+            downloadDrawBtn.classList.add('hidden');
 
             const imageDataUrl = drawingCanvas.toDataURL('image/png');
             const base64Data = imageDataUrl.split(',')[1];
@@ -347,6 +374,7 @@
                     const imageUrl = `data:image/png;base64,${generationResult.predictions[0].bytesBase64Encoded}`;
                     drawImage.src = imageUrl;
                     drawImage.classList.remove('hidden');
+                    downloadDrawBtn.classList.remove('hidden');
                     descriptionText.innerText = description; // Final description
                 } else {
                     drawPlaceholder.innerText = "Could not generate image from description. Please try again.";
