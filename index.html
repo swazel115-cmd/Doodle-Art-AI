@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Subscription App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2rem;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+            padding: 2rem;
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+        .button {
+            transition: transform 0.2s, background-color 0.2s;
+            cursor: pointer;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+          0%, 100% {
+            transform: translateY(0) scale(1);
+          }
+          50% {
+            transform: translateY(-2px) scale(1.02);
+          }
+        }
+        .button:hover {
+            transform: translateY(-2px);
+        }
+        .button:active {
+            transform: translateY(0);
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 90%;
+            width: 400px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center">
+
+    <!-- Page Content Container -->
+    <div id="page-home" class="container page">
+        <h1 class="text-3xl font-bold mb-4 text-gray-800">Your App</h1>
+        <p id="status-message" class="text-gray-600 mb-6">Checking subscription status...</p>
+        <p class="text-xs text-gray-500 mb-4">User ID: <span id="user-id"></span></p>
+
+        <!-- Premium-only content -->
+        <div id="premium-content" class="hidden">
+            <h2 class="text-2xl font-bold text-yellow-500 mb-4">✨ You are a Premium User! ✨</h2>
+            <p class="text-gray-700">Access exclusive features and content.</p>
+            <button id="signout-button" class="button py-2 px-4 mt-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-sm focus:outline-none">
+                Sign Out
+            </button>
+            
+            <!-- AI Generator Section -->
+            <div id="ai-generator" class="mt-8 text-left">
+                <h3 class="text-xl font-semibold mb-4 text-gray-800">AI Text Generator</h3>
+                <textarea id="prompt-input" rows="4" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition duration-200" placeholder="Enter your prompt here..."></textarea>
+                <button id="generate-button" class="button w-full py-3 mt-4 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg shadow-md focus:outline-none flex items-center justify-center">
+                    Generate Text
+                </button>
+                <div id="loading-indicator" class="hidden mt-4 flex justify-center">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div id="response-container" class="mt-6 p-4 bg-gray-100 rounded-lg border border-gray-300 overflow-y-auto max-h-60 whitespace-pre-wrap">
+                    <p class="text-gray-500">Your generated text will appear here.</p>
+                </div>
+            </div>
+
+            <!-- Image Generator Section -->
+            <div id="image-generator" class="mt-8 text-left">
+                <h3 class="text-xl font-semibold mb-4 text-gray-800">AI Image Generator</h3>
+                <textarea id="image-prompt-input" rows="4" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition duration-200" placeholder="Enter a prompt to generate an image..."></textarea>
+                <button id="generate-image-button" class="button w-full py-3 mt-4 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg shadow-md focus:outline-none flex items-center justify-center">
+                    Generate Image
+                </button>
+                <div id="image-loading-indicator" class="hidden mt-4 flex justify-center">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div id="image-container" class="mt-6 p-4 bg-gray-100 rounded-lg border border-gray-300 flex justify-center items-center overflow-hidden">
+                    <p class="text-gray-500">Your generated image will appear here.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upgrade button for non-premium users -->
+        <button id="upgrade-button" class="hidden button w-full py-3 mt-6 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg shadow-md focus:outline-none">
+            Unlock Premium for $4.99
+        </button>
+    </div>
+
+    <!-- Payment Simulation Modal -->
+    <div id="payment-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold mb-4">Simulated Payment</h2>
+            <p class="text-gray-600 mb-6">This is where a secure Stripe form would appear. For this demo, we'll simulate a successful payment.</p>
+            <div class="flex flex-col space-y-4">
+                <button id="pay-button" class="button w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md focus:outline-none">
+                    <div class="flex items-center justify-center">
+                        <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 4a2 2 0 00-2 2v6a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 8H4V8h12v4zm-3-2a1 1 0 11-2 0 1 1 0 012 0z"/>
+                        </svg>
+                        Pay Now
+                    </div>
+                </button>
+                <button id="cancel-button" class="button w-full py-3 text-gray-700 font-semibold rounded-lg focus:outline-none">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth;
+        let userId;
+
+        // --- UI Elements ---
+        const statusMessageEl = document.getElementById('status-message');
+        const userIdEl = document.getElementById('user-id');
+        const premiumContentEl = document.getElementById('premium-content');
+        const upgradeButtonEl = document.getElementById('upgrade-button');
+        const paymentModalEl = document.getElementById('payment-modal');
+        const payButtonEl = document.getElementById('pay-button');
+        const cancelButtonEl = document.getElementById('cancel-button');
+        const aiGeneratorEl = document.getElementById('ai-generator');
+        const promptInputEl = document.getElementById('prompt-input');
+        const generateButtonEl = document.getElementById('generate-button');
+        const loadingIndicatorEl = document.getElementById('loading-indicator');
+        const responseContainerEl = document.getElementById('response-container');
+        const signoutButtonEl = document.getElementById('signout-button');
+        
+        // New UI elements for Image Generator
+        const imageGeneratorEl = document.getElementById('image-generator');
+        const imagePromptInputEl = document.getElementById('image-prompt-input');
+        const generateImageButtonEl = document.getElementById('generate-image-button');
+        const imageLoadingIndicatorEl = document.getElementById('image-loading-indicator');
+        const imageContainerEl = document.getElementById('image-container');
+
+        // --- Functions ---
+        const showModal = () => paymentModalEl.style.display = 'flex';
+        const hideModal = () => paymentModalEl.style.display = 'none';
+
+        async function initFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                setLogLevel('debug');
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdEl.textContent = userId;
+                        console.log("User signed in:", userId);
+
+                        const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/user_data/account`);
+                        onSnapshot(userDocRef, (docSnap) => {
+                            if (docSnap.exists()) {
+                                const userData = docSnap.data();
+                                const isPremium = userData.isPremium;
+                                console.log("User data updated. isPremium:", isPremium);
+                                updateUI(isPremium);
+                            } else {
+                                console.log("No user data found. Creating new document.");
+                                updateUserAccount(false);
+                                updateUI(false);
+                            }
+                        }, (error) => {
+                            console.error("Error listening to user data:", error);
+                            statusMessageEl.textContent = "Error fetching user data. Please ensure you have the correct permissions.";
+                        });
+                    } else {
+                        console.log("User signed out. Signing in anonymously...");
+                        await signInAnonymously(auth);
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                statusMessageEl.textContent = `Error: Could not connect to the database.`;
+            }
+        }
+        
+        function updateUI(isPremium) {
+            if (isPremium) {
+                statusMessageEl.textContent = `You are a premium user. Your User ID is: ${userId}`;
+                premiumContentEl.classList.remove('hidden');
+                upgradeButtonEl.classList.add('hidden');
+                aiGeneratorEl.classList.remove('hidden');
+                imageGeneratorEl.classList.remove('hidden');
+            } else {
+                statusMessageEl.textContent = `You are a free user. Your User ID is: ${userId}`;
+                premiumContentEl.classList.add('hidden');
+                upgradeButtonEl.classList.remove('hidden');
+                aiGeneratorEl.classList.add('hidden');
+                imageGeneratorEl.classList.add('hidden');
+            }
+        }
+
+        async function updateUserAccount(isPremium) {
+            if (!db || !userId) {
+                console.error("Database or User ID not available.");
+                return;
+            }
+            try {
+                const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/user_data/account`);
+                await setDoc(userDocRef, { isPremium: isPremium }, { merge: true });
+                console.log("User account updated successfully.");
+            } catch (error) {
+                console.error("Error updating user account:", error);
+            }
+        }
+
+        async function generateText(prompt) {
+            loadingIndicatorEl.classList.remove('hidden');
+            generateButtonEl.disabled = true;
+            responseContainerEl.textContent = 'Generating...';
+
+            // Gemini API configuration
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (text) {
+                    responseContainerEl.textContent = text;
+                } else {
+                    responseContainerEl.textContent = "Could not generate text. Please try again.";
+                }
+            } catch (error) {
+                console.error("Error generating text:", error);
+                responseContainerEl.textContent = `An error occurred: ${error.message}`;
+            } finally {
+                loadingIndicatorEl.classList.add('hidden');
+                generateButtonEl.disabled = false;
+            }
+        }
+
+        async function generateImage(prompt) {
+            imageLoadingIndicatorEl.classList.remove('hidden');
+            generateImageButtonEl.disabled = true;
+            imageContainerEl.innerHTML = `<p class="text-gray-500">Generating image...</p>`;
+
+            const payload = { instances: { prompt: prompt }, parameters: { "sampleCount": 1} };
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                    const base64Data = result.predictions[0].bytesBase64Encoded;
+                    const imageUrl = `data:image/png;base64,${base64Data}`;
+                    imageContainerEl.innerHTML = `<img src="${imageUrl}" alt="Generated Image" class="rounded-lg w-full h-auto">`;
+                } else {
+                    imageContainerEl.innerHTML = `<p class="text-red-500">Could not generate image. Please try again with a different prompt.</p>`;
+                }
+            } catch (error) {
+                console.error("Error generating image:", error);
+                imageContainerEl.innerHTML = `<p class="text-red-500">An error occurred: ${error.message}</p>`;
+            } finally {
+                imageLoadingIndicatorEl.classList.add('hidden');
+                generateImageButtonEl.disabled = false;
+            }
+        }
+
+
+        // --- Event Listeners ---
+        upgradeButtonEl.addEventListener('click', showModal);
+        cancelButtonEl.addEventListener('click', hideModal);
+        signoutButtonEl.addEventListener('click', async () => {
+            console.log("Signing out...");
+            // We'll update the account status on the next sign-in to prevent a race condition on sign out
+            await signOut(auth);
+            // Reload the page to reset the app state
+            window.location.reload();
+        });
+
+        // This is the main event listener for the payment modal.
+        payButtonEl.addEventListener('click', async () => {
+            console.log("Simulating payment success...");
+            hideModal();
+            // Update the Firestore document to reflect the premium status
+            await updateUserAccount(true);
+        });
+
+        // Event listener for the new "Generate" button
+        generateButtonEl.addEventListener('click', () => {
+            const prompt = promptInputEl.value;
+            if (prompt.trim() !== '') {
+                generateText(prompt);
+            } else {
+                responseContainerEl.textContent = "Please enter a prompt to generate text.";
+            }
+        });
+
+        // Event listener for the new "Generate Image" button
+        generateImageButtonEl.addEventListener('click', () => {
+            const prompt = imagePromptInputEl.value;
+            if (prompt.trim() !== '') {
+                generateImage(prompt);
+            } else {
+                imageContainerEl.innerHTML = `<p class="text-red-500">Please enter a prompt to generate an image.</p>`;
+            }
+        });
+
+        // Initialize the app on window load
+        window.onload = () => {
+            initFirebase();
+        };
+    </script>
+</body>
+</html>
+
