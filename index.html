@@ -186,7 +186,10 @@
 
             const prompt = textPromptInput.value.trim();
             if (!prompt) {
-                textPromptInput.placeholder = "Please enter a prompt!";
+                textPlaceholder.innerText = "Please enter a prompt to generate an image.";
+                textPlaceholder.classList.remove('hidden');
+                textImage.classList.add('hidden');
+                downloadTextBtn.classList.add('hidden');
                 return;
             }
 
