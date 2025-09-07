@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doodle Art AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #f3f4f6;
+            color: #1f2937;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-fast {
+            animation: spin 0.7s linear infinite;
+        }
+        .message-box {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            padding: 0.75rem 1.5rem;
+            background-color: #1f2937;
+            color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .message-box.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Use provided global variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // API Key and URLs for Gemini models
+        const apiKey = "";
+        const apiImagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+        const apiVisionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        setLogLevel('Debug'); // Enable debug logging for Firestore
+
+        // DOM elements
+        const mainContainer = document.getElementById('main-container');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const dashboard = document.getElementById('dashboard');
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+        const dashboardBtn = document.getElementById('dashboardBtn');
+        const premiumBtn = document.getElementById('premiumBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userStatus = document.getElementById('userStatus');
+        
+        // Let's Draw! Text-to-Image UI
+        const drawSection = document.getElementById('draw-section');
+        const promptInput = document.getElementById('prompt');
+        const generateBtn = document.getElementById('generateBtn');
+        const drawGenerationStatus = document.getElementById('drawGenerationStatus');
+        const drawGeneratedImage = document.getElementById('drawGeneratedImage');
+        const drawDownloadBtn = document.getElementById('drawDownloadBtn');
+
+        // Premium UI
+        const premiumSection = document.getElementById('premium-section');
+        const premiumStatusText = document.getElementById('premium-status-text');
+        const uploadInput = document.getElementById('uploadInput');
+        const describeAndDrawBtn = document.getElementById('describeAndDrawBtn');
+        const premiumGenerationStatus = document.getElementById('premiumGenerationStatus');
+        const premiumGeneratedDescription = document.getElementById('premiumGeneratedDescription');
+        const premiumGeneratedImage = document.getElementById('premiumGeneratedImage');
+        const premiumDownloadBtn = document.getElementById('premiumDownloadBtn');
+        
+        // General UI
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const historyContainer = document.getElementById('history-container');
+        const historyStatus = document.getElementById('history-status');
+        const historySection = document.getElementById('history-section');
+
+        let currentUserId = null;
+        let userDataRef = null;
+        let userDataUnsubscribe = null;
+        let historyCollectionRef = null;
+        let historyUnsubscribe = null;
+        let initialAuthCheckDone = false;
+        let currentPremiumPrompt = '';
+
+        // Function to show a temporary message
+        function showMessage(message) {
+            messageText.textContent = message;
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 3000);
+        }
+
+        // --- UI State Management ---
+        function showSection(sectionId) {
+            [loginForm, registerForm, dashboard].forEach(el => el.classList.add('hidden'));
+            document.getElementById(sectionId).classList.remove('hidden');
+        }
+
+        function updateUI(user) {
+            if (user) {
+                currentUserId = user.uid;
+                loginBtn.classList.add('hidden');
+                registerBtn.classList.add('hidden');
+                dashboardBtn.classList.remove('hidden');
+                premiumBtn.classList.remove('hidden');
+                logoutBtn.classList.remove('hidden');
+                userStatus.innerHTML = `Welcome, <span class="font-bold text-gray-800 break-all">${user.email || 'Guest'}</span>!`;
+                
+                // Set up Firestore listener for user data
+                if (userDataUnsubscribe) userDataUnsubscribe();
+                userDataRef = doc(db, `artifacts/${appId}/users/${currentUserId}/user_data/account`);
+                userDataUnsubscribe = onSnapshot(userDataRef, (docSnap) => {
+                    const userData = docSnap.exists() ? docSnap.data() : { isPremium: false };
+                    
+                    if (userData.isPremium) {
+                        userStatus.innerHTML = `Welcome, <span class="font-bold text-gray-800 break-all">${user.email || 'Guest'}</span>! <span class="text-green-500 font-bold">Premium: Unlimited generations.</span>`;
+                        premiumSection.classList.remove('hidden');
+                        historySection.classList.remove('hidden');
+                    } else {
+                        userStatus.innerHTML = `Welcome, <span class="font-bold text-gray-800 break-all">${user.email || 'Guest'}</span>!`;
+                        premiumSection.classList.add('hidden');
+                        historySection.classList.add('hidden');
+                    }
+                });
+
+                // Set up Firestore listener for history (only for premium users)
+                if (historyUnsubscribe) historyUnsubscribe();
+                historyCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/history`);
+                historyUnsubscribe = onSnapshot(historyCollectionRef, (querySnapshot) => {
+                    const history = [];
+                    querySnapshot.forEach((doc) => {
+                        history.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    // Sort history by timestamp in memory (newest first)
+                    history.sort((a, b) => b.timestamp - a.timestamp);
+                    renderHistory(history);
+                });
+
+            } else {
+                currentUserId = null;
+                loginBtn.classList.remove('hidden');
+                registerBtn.classList.remove('hidden');
+                dashboardBtn.classList.add('hidden');
+                premiumBtn.classList.add('hidden');
+                logoutBtn.classList.add('hidden');
+                userStatus.innerHTML = `Welcome, Guest!`;
+                // Clean up Firestore listeners
+                if (userDataUnsubscribe) userDataUnsubscribe();
+                if (historyUnsubscribe) historyUnsubscribe();
+            }
+        }
+
+        // Function to render the history
+        function renderHistory(history) {
+            historyContainer.innerHTML = ''; // Clear previous history
+            if (history.length === 0) {
+                historyStatus.textContent = "Your history is currently empty.";
+                historyStatus.classList.remove('hidden');
+            } else {
+                historyStatus.classList.add('hidden');
+                history.forEach(item => {
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 transition-transform hover:scale-105 flex flex-col items-center';
+                    historyItem.innerHTML = `
+                        <img src="${item.imageUrl}" alt="${item.prompt}" class="w-full h-auto rounded-lg mb-2 border border-gray-300">
+                        <p class="text-sm text-gray-700 mt-2 font-medium text-center">Prompt: <span class="font-normal italic">${item.prompt}</span></p>
+                        <p class="text-xs text-gray-500 mt-1">${new Date(item.timestamp).toLocaleString()}</p>
+                        <button class="mt-4 px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-300 download-history-btn" data-image-url="${item.imageUrl}">Download</button>
+                    `;
+                    historyContainer.appendChild(historyItem);
+                });
+
+                // Add event listeners to all new download buttons
+                document.querySelectorAll('.download-history-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const imageUrl = e.target.dataset.imageUrl;
+                        if (imageUrl) {
+                            const a = document.createElement('a');
+                            a.href = imageUrl;
+                            a.download = 'doodle_art_history.png';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            showMessage("Image downloaded!");
+                        }
+                    });
+                });
+            }
+        }
+
+        // --- Event Listeners ---
+        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = e.target.loginEmail.value;
+            const password = e.target.loginPassword.value;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                showMessage("Logged in successfully!");
+            } catch (error) {
+                console.error("Login Error:", error);
+                showMessage("Login failed: " + error.message);
+            }
+        });
+
+        document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = e.target.registerEmail.value;
+            const password = e.target.registerPassword.value;
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const userDocRef = doc(db, `artifacts/${appId}/users/${userCredential.user.uid}/user_data/account`);
+                await setDoc(userDocRef, { isPremium: false }); // Initial non-premium account
+                showMessage("Account created and logged in!");
+            } catch (error) {
+                console.error("Registration Error:", error);
+                showMessage("Registration failed: " + error.message);
+            }
+        });
+
+        // Let's Draw! Text-to-Image Generation
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                showMessage("Please enter a prompt!");
+                return;
+            }
+
+            drawGenerationStatus.classList.remove('hidden', 'text-green-500', 'text-red-500');
+            drawGenerationStatus.classList.add('flex');
+            drawGenerationStatus.innerHTML = `<svg class="animate-spin-fast h-5 w-5 mr-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating image...`;
+            drawGeneratedImage.src = '';
+            drawGeneratedImage.classList.add('hidden');
+            drawDownloadBtn.classList.add('hidden'); 
+
+            try {
+                const payload = { 
+                    instances: [{ prompt: prompt }], 
+                    parameters: { sampleCount: 1 } 
+                };
+
+                const response = await fetch(apiImagenUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.predictions && result.predictions.length > 0) {
+                    const base64Data = result.predictions[0].bytesBase64Encoded;
+                    if (base64Data) {
+                        const imageUrl = `data:image/png;base64,${base64Data}`;
+                        drawGeneratedImage.src = imageUrl;
+                        drawGeneratedImage.classList.remove('hidden');
+                        drawDownloadBtn.classList.remove('hidden');
+                        
+                    } else {
+                        throw new Error("No image data received.");
+                    }
+                    drawGenerationStatus.classList.add('hidden');
+                } else {
+                    throw new Error(result.error?.message || "Generation failed. Please try again.");
+                }
+
+            } catch (error) {
+                console.error("Image Generation Error:", error);
+                drawGenerationStatus.classList.remove('hidden', 'flex');
+                drawGenerationStatus.classList.add('text-red-500');
+                drawGenerationStatus.textContent = `Error: ${error.message}`;
+            }
+        });
+
+        // Premium Image-to-Text-to-Image Generation
+        document.getElementById('describeAndDrawBtn').addEventListener('click', async () => {
+            const file = uploadInput.files[0];
+            if (!file) {
+                showMessage("Please upload a doodle first!");
+                return;
+            }
+
+            if (!currentUserId) {
+                showMessage("You must be logged in to use this feature.");
+                return;
+            }
+            
+            // Check if user is premium before proceeding
+            const userDoc = await getDoc(userDataRef);
+            const userData = userDoc.data();
+            if (!userData || !userData.isPremium) {
+                showMessage("This is a premium feature. Please contact support to upgrade your account.");
+                return;
+            }
+            
+            // Reset UI
+            premiumGeneratedDescription.textContent = '';
+            premiumGeneratedDescription.classList.add('hidden');
+            premiumGeneratedImage.src = '';
+            premiumGeneratedImage.classList.add('hidden');
+            premiumDownloadBtn.classList.add('hidden');
+            premiumGenerationStatus.classList.add('flex');
+            premiumGenerationStatus.innerHTML = `<svg class="animate-spin-fast h-5 w-5 mr-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Analyzing your doodle...`;
+
+            try {
+                // Step 1: Image to Text
+                const base64Data = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                const visionPayload = {
+                    contents: [{
+                        parts: [
+                            { text: "Describe this doodle art in detail so that an image generation AI can recreate it. Focus on colors, shapes, and overall mood." },
+                            { inlineData: { mimeType: file.type, data: base64Data } }
+                        ]
+                    }],
+                };
+
+                const visionResponse = await fetch(apiVisionUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(visionPayload)
+                });
+
+                const visionResult = await visionResponse.json();
+                if (!visionResponse.ok || !visionResult.candidates || visionResult.candidates.length === 0) {
+                    throw new Error("Failed to describe doodle.");
+                }
+                const description = visionResult.candidates[0].content.parts[0].text;
+                premiumGeneratedDescription.textContent = `AI Description: "${description}"`;
+                premiumGeneratedDescription.classList.remove('hidden');
+
+                // Update status to show next step
+                premiumGenerationStatus.innerHTML = `<svg class="animate-spin-fast h-5 w-5 mr-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating new image based on description...`;
+
+                // Step 2: Text to Image
+                const imagenPayload = { 
+                    instances: [{ prompt: description }], 
+                    parameters: { sampleCount: 1 } 
+                };
+
+                const imagenResponse = await fetch(apiImagenUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(imagenPayload)
+                });
+                
+                const imagenResult = await imagenResponse.json();
+                
+                if (imagenResponse.ok && imagenResult.predictions && imagenResult.predictions.length > 0) {
+                    const newBase64Data = imagenResult.predictions[0].bytesBase64Encoded;
+                    if (newBase64Data) {
+                        const newImageUrl = `data:image/png;base64,${newBase64Data}`;
+                        premiumGeneratedImage.src = newImageUrl;
+                        premiumGeneratedImage.classList.remove('hidden');
+                        premiumDownloadBtn.classList.remove('hidden');
+
+                        // Save to history for premium users
+                        const historyDoc = {
+                            prompt: description,
+                            imageUrl: newImageUrl,
+                            timestamp: Date.now()
+                        };
+                        await addDoc(historyCollectionRef, historyDoc);
+                    } else {
+                        throw new Error("No new image data received.");
+                    }
+                    premiumGenerationStatus.classList.add('hidden');
+                } else {
+                    throw new Error(imagenResult.error?.message || "Generation failed. Please try again.");
+                }
+
+            } catch (error) {
+                console.error("Premium Generation Error:", error);
+                premiumGenerationStatus.classList.remove('hidden', 'flex');
+                premiumGenerationStatus.classList.add('text-red-500');
+                premiumGenerationStatus.textContent = `Error: ${error.message}`;
+            }
+        });
+
+        // Add a click listener to the main download buttons
+        drawDownloadBtn.addEventListener('click', () => {
+            const imageUrl = drawGeneratedImage.src;
+            if (imageUrl) {
+                const a = document.createElement('a');
+                a.href = imageUrl;
+                a.download = 'doodle_art.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showMessage("Image downloaded!");
+            }
+        });
+        premiumDownloadBtn.addEventListener('click', () => {
+            const imageUrl = premiumGeneratedImage.src;
+            if (imageUrl) {
+                const a = document.createElement('a');
+                a.href = imageUrl;
+                a.download = 'doodle_art.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showMessage("Image downloaded!");
+            }
+        });
+
+        // Initialize auth state listener
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // User is signed in. Ensure their user data document exists.
+                const userDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/user_data/account`);
+                const userDocSnap = await getDoc(userDocRef);
+                if (!userDocSnap.exists()) {
+                    await setDoc(userDocRef, { isPremium: false });
+                }
+                
+                updateUI(user);
+                showSection('dashboard');
+                initialAuthCheckDone = true;
+            } else {
+                // User is signed out
+                if (!initialAuthCheckDone) {
+                    // This is the initial app load, try to sign in
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Authentication Error:", error);
+                        showMessage("Failed to sign in. Please refresh the page.");
+                    }
+                    initialAuthCheckDone = true;
+                } else {
+                    // User has explicitly logged out, show the login form
+                    updateUI(null);
+                    showSection('loginForm');
+                }
+            }
+        });
+
+        // Navigation buttons
+        loginBtn.addEventListener('click', () => showSection('loginForm'));
+        registerBtn.addEventListener('click', () => showSection('registerForm'));
+        dashboardBtn.addEventListener('click', () => showSection('dashboard'));
+        premiumBtn.addEventListener('click', () => {
+          showSection('dashboard');
+          premiumSection.classList.remove('hidden');
+          document.getElementById('premium-section').scrollIntoView({ behavior: 'smooth' });
+        });
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                showMessage("Logged out successfully!");
+            } catch (error) {
+                console.error("Logout Error:", error);
+                showMessage("Failed to log out. " + error.message);
+            }
+        });
+    </script>
+    
+    <div id="main-container" class="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-6 md:p-10 border border-gray-200">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800">Doodle Art AI</h1>
+            <nav class="mt-4 space-x-2">
+                <button id="loginBtn" class="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">Login</button>
+                <button id="registerBtn" class="px-4 py-2 font-semibold text-white bg-gray-500 rounded-lg shadow-md hover:bg-gray-600 transition-colors duration-300">Register</button>
+                <button id="dashboardBtn" class="hidden px-4 py-2 font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300">Dashboard</button>
+                <button id="premiumBtn" class="px-4 py-2 font-semibold text-white bg-yellow-600 rounded-lg shadow-md hover:bg-yellow-700 transition-colors duration-300">Premium</button>
+                <button id="logoutBtn" class="hidden px-4 py-2 font-semibold text-white bg-red-600 rounded-lg shadow-md hover:bg-red-700 transition-colors duration-300">Logout</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Login Form -->
+            <div id="loginForm" class="hidden">
+                <h2 class="text-2xl font-bold text-center mb-4">Login</h2>
+                <form id="loginFormElement" class="flex flex-col gap-4 max-w-sm mx-auto">
+                    <input type="email" id="loginEmail" placeholder="Email" required class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="password" id="loginPassword" placeholder="Password" required class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button type="submit" class="p-3 font-semibold text-white bg-indigo-600 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">Login</button>
+                </form>
+            </div>
+
+            <!-- Register Form -->
+            <div id="registerForm" class="hidden">
+                <h2 class="text-2xl font-bold text-center mb-4">Register</h2>
+                <form id="registerFormElement" class="flex flex-col gap-4 max-w-sm mx-auto">
+                    <input type="email" id="registerEmail" placeholder="Email" required class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="password" id="registerPassword" placeholder="Password" required class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button type="submit" class="p-3 font-semibold text-white bg-gray-500 rounded-lg shadow-md hover:bg-gray-600 transition-colors duration-300">Register</button>
+                </form>
+            </div>
+
+            <!-- Dashboard -->
+            <div id="dashboard" class="hidden text-center">
+                <p id="userStatus" class="mb-4 text-lg text-gray-700"></p>
+
+                <!-- Let's Draw! Text-to-Image Section -->
+                <div id="draw-section" class="mb-8 p-6 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
+                    <h2 class="text-xl font-bold mb-2">Let's Draw! Text to Image</h2>
+                    <p class="text-sm text-gray-500 mb-4">Unleash your creativity and generate an image from your text prompt.</p>
+                    <textarea id="prompt" placeholder="Enter your image prompt here (e.g., 'A whimsical cat wearing a top hat')" rows="4" required class="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                    <button id="generateBtn" class="w-full p-3 font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300">Generate Image</button>
+                    <div id="drawGenerationStatus" class="status mt-4 hidden justify-center items-center font-bold text-lg text-gray-600"></div>
+                    <img id="drawGeneratedImage" alt="Generated Image" class="hidden mt-6 rounded-lg shadow-lg border border-gray-300 max-w-full h-auto mx-auto" />
+                    <button id="drawDownloadBtn" class="hidden mt-4 p-3 font-semibold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-300">Download Image</button>
+                </div>
+
+                <!-- Premium Image-to-Text-to-Image Section -->
+                <div id="premium-section" class="mb-8 p-6 bg-yellow-50 rounded-xl shadow-inner border border-yellow-300">
+                    <h2 class="text-xl font-bold text-yellow-800 mb-2">✨ Premium Feature: Doodle to Masterpiece</h2>
+                    <p class="text-sm text-yellow-700 mb-4">Upload a doodle, and the AI will analyze it, describe it in detail, and then use that description to draw a new, polished image!</p>
+                    <div class="flex flex-col gap-4 items-center">
+                        <input type="file" id="uploadInput" accept="image/png, image/jpeg" class="block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-indigo-50 file:text-indigo-700
+                          hover:file:bg-indigo-100" />
+                        <button id="describeAndDrawBtn" class="w-full p-3 font-semibold text-white bg-yellow-600 rounded-lg shadow-md hover:bg-yellow-700 transition-colors duration-300">Describe & Draw</button>
+                    </div>
+                    <div id="premiumGenerationStatus" class="status mt-4 hidden justify-center items-center font-bold text-lg text-gray-600"></div>
+                    <div id="premiumGeneratedDescription" class="mt-4 p-4 text-sm text-gray-700 italic bg-white rounded-lg border border-gray-200 hidden"></div>
+                    <img id="premiumGeneratedImage" alt="Generated Image" class="hidden mt-6 rounded-lg shadow-lg border border-gray-300 max-w-full h-auto mx-auto" />
+                    <button id="premiumDownloadBtn" class="hidden mt-4 p-3 font-semibold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-300">Download Image</button>
+                </div>
+
+                <div id="history-section" class="hidden mt-8 text-left">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Generation History</h2>
+                    <p id="history-status" class="text-center text-gray-500 italic"></p>
+                    <div id="history-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- History items will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <footer class="mt-8 text-center text-gray-500 text-sm">
+            <p>&copy; 2025 Doodle Art AI. All rights reserved.</p>
+        </footer>
+
+        <div id="message-box" class="message-box">
+            <p id="message-text"></p>
+        </div>
+    </div>
+</body>
+</html>
