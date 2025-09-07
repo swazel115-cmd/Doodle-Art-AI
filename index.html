@@ -3,47 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doodle Art AI</title>
+    <title>AI Image Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Permanent+Marker&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
-            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(243,244,246,1) 100%);
         }
         .container {
             max-width: 1200px;
         }
         .card {
             background-color: white;
-            border-radius: 2rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            transition: transform 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-        }
-        .title-font {
-            font-family: 'Permanent Marker', cursive;
-            color: #dc2626; /* A slightly darker red */
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
         .btn {
-            @apply px-8 py-4 rounded-full font-bold transition-all duration-300;
+            @apply px-6 py-3 rounded-full font-semibold transition-all duration-300;
         }
         .btn-primary {
-            @apply bg-red-600 text-white hover:bg-red-700 border-2 border-red-800 hover:shadow-md;
+            @apply bg-blue-500 text-white hover:bg-blue-600;
         }
         .btn-secondary {
-            @apply bg-green-600 text-white hover:bg-green-700 border-2 border-green-800 hover:shadow-md;
-        }
-        .btn-copy {
-            @apply bg-transparent text-red-600 border-2 border-red-600 hover:bg-red-50 hover:text-red-700;
+            @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
         }
         .loading-spinner {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #ef4444; /* Red spinner */
+            border-top: 4px solid #3498db;
             border-radius: 50%;
             width: 24px;
             height: 24px;
@@ -54,20 +41,19 @@
             100% { transform: rotate(360deg); }
         }
         canvas {
-            border: 3px solid #e5e7eb;
-            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+            border: 2px solid #e5e7eb;
             cursor: crosshair;
             background-color: white;
-            touch-action: none;
+            touch-action: none; /* Prevents scrolling on touch */
         }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
-    <div class="container mx-auto space-y-12">
+    <div class="container mx-auto space-y-8">
         <header class="text-center mb-12">
-            <h1 class="title-font text-5xl md:text-6xl font-bold mb-4">Doodle Art AI</h1>
-            <p class="text-lg text-gray-600">Bring your imagination to life with AI-powered art generation.</p>
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-2">AI Image Studio</h1>
+            <p class="text-lg text-gray-600">Explore creativity with two different AI-powered generators.</p>
         </header>
 
         <!-- Section 1: Text-to-Image Generator -->
@@ -76,23 +62,23 @@
             <div class="w-full max-w-2xl">
                 <p class="text-gray-600 mb-4 text-center">Type a detailed description of what you want to create.</p>
                 <div class="flex flex-col md:flex-row items-center gap-4">
-                    <input type="text" id="promptInput" placeholder="A magical forest with glowing mushrooms and tiny fairies, watercolor style" class="flex-grow w-full md:w-auto p-4 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-600">
+                    <input type="text" id="promptInput" placeholder="A futuristic cyberpunk city with neon lights and flying cars" class="flex-grow w-full md:w-auto p-4 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <button id="generateBtn" class="btn btn-primary w-full md:w-auto flex items-center justify-center gap-2">
-                        Generate Images
+                        Generate Image
                         <div id="textSpinner" class="hidden loading-spinner"></div>
                     </button>
                 </div>
             </div>
-            <div id="textResultContainer" class="mt-8 w-full max-w-4xl flex items-center justify-center min-h-[300px] text-center">
-                <div id="textImageGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
-                <p id="textPlaceholder" class="text-gray-400">Your generated images will appear here.</p>
+            <div id="textResultContainer" class="mt-8 w-full max-w-3xl flex items-center justify-center min-h-[300px]">
+                <img id="textImage" class="rounded-2xl max-w-full max-h-[600px] hidden" alt="Generated Image">
+                <p id="textPlaceholder" class="text-gray-400 text-center">Your generated image will appear here.</p>
             </div>
         </div>
 
         <!-- Section 2: Drawing Analyzer and Generator -->
         <div class="card p-6 md:p-10 flex flex-col items-center">
             <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Generate from Your Drawing</h2>
-            <p class="text-gray-600 mb-4 text-center">Draw something on the canvas below, and the AI will analyze it and create new images.</p>
+            <p class="text-gray-600 mb-4 text-center">Draw something on the canvas below, and the AI will analyze it and create a new image.</p>
             
             <div class="w-full max-w-4xl flex flex-col lg:flex-row items-center lg:items-start gap-8">
                 <!-- Drawing Canvas -->
@@ -110,17 +96,14 @@
                     
                     <div class="mt-8 w-full">
                         <h3 class="font-semibold text-xl text-gray-700 mb-2">AI Description:</h3>
-                        <div class="flex items-center gap-2 mb-2">
-                            <p id="descriptionText" class="p-4 bg-gray-100 rounded-xl text-gray-600 italic flex-grow min-h-[50px]">Description will appear here after analysis...</p>
-                            <button id="copyPromptBtn" class="btn btn-copy self-start px-4 py-2 text-sm hidden">Copy</button>
-                        </div>
+                        <p id="descriptionText" class="p-4 bg-gray-100 rounded-xl text-gray-600 italic min-h-[50px]">Description will appear here after analysis...</p>
                     </div>
                     
                     <div class="mt-8 w-full">
-                        <h3 class="font-semibold text-xl text-gray-700 mb-2">Generated Images:</h3>
-                        <div id="drawResultContainer" class="flex items-center justify-center min-h-[300px] text-center">
-                            <div id="drawImageGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
-                            <p id="drawPlaceholder" class="text-gray-400">The generated images from your drawing will appear here.</p>
+                        <h3 class="font-semibold text-xl text-gray-700 mb-2">Generated Image:</h3>
+                        <div id="drawResultContainer" class="flex items-center justify-center min-h-[300px]">
+                            <img id="drawImage" class="rounded-2xl max-w-full max-h-[600px] hidden" alt="Generated Image">
+                            <p id="drawPlaceholder" class="text-gray-400 text-center">The generated image from your drawing will appear here.</p>
                         </div>
                     </div>
                 </div>
@@ -129,14 +112,17 @@
     </div>
 
     <script>
+        // Use a single variable to check if a request is in progress
         let isGenerating = false;
+        
+        // Configuration for exponential backoff
         const MAX_RETRIES = 3;
-        const INITIAL_DELAY = 1000;
+        const INITIAL_DELAY = 1000; // 1 second
         
         const textPromptInput = document.getElementById('promptInput');
         const generateBtn = document.getElementById('generateBtn');
         const textSpinner = document.getElementById('textSpinner');
-        const textImageGrid = document.getElementById('textImageGrid');
+        const textImage = document.getElementById('textImage');
         const textPlaceholder = document.getElementById('textPlaceholder');
 
         const drawingCanvas = document.getElementById('drawingCanvas');
@@ -145,27 +131,27 @@
         const analyzeBtn = document.getElementById('analyzeBtn');
         const drawSpinner = document.getElementById('drawSpinner');
         const descriptionText = document.getElementById('descriptionText');
-        const drawImageGrid = document.getElementById('drawImageGrid');
+        const drawImage = document.getElementById('drawImage');
         const drawPlaceholder = document.getElementById('drawPlaceholder');
-        const copyPromptBtn = document.getElementById('copyPromptBtn');
 
-        const API_KEY = "";
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${API_KEY}`;
-        
+        const API_KEY = ""; // This will be provided by the runtime
+        const TEXT_TO_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
+        const IMAGE_TO_TEXT_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        const GENERATE_IMAGE_MODEL = "imagen-3.0-generate-002";
+        const ANALYZE_IMAGE_MODEL = "gemini-2.5-flash-preview-05-20";
+
+        // --- Utility Function for Exponential Backoff ---
         async function fetchWithBackoff(url, options, retries = MAX_RETRIES, delay = INITIAL_DELAY) {
             try {
                 const response = await fetch(url, options);
                 if (!response.ok) {
-                    const errorBody = await response.text();
-                    console.error('API call failed. Status:', response.status, 'Error Body:', errorBody);
                     if (response.status === 429 && retries > 0) {
                         await new Promise(res => setTimeout(res, delay));
                         return fetchWithBackoff(url, options, retries - 1, delay * 2);
                     }
                     throw new Error(`API call failed with status: ${response.status}`);
                 }
-                const json = await response.json();
-                return json;
+                return await response.json();
             } catch (error) {
                 console.error('Fetch error:', error);
                 if (retries > 0) {
@@ -182,8 +168,7 @@
 
             const prompt = textPromptInput.value.trim();
             if (!prompt) {
-                textPlaceholder.innerText = "Please enter a prompt to generate images.";
-                textPlaceholder.classList.remove('hidden');
+                textPromptInput.placeholder = "Please enter a prompt!";
                 return;
             }
 
@@ -191,41 +176,33 @@
             generateBtn.disabled = true;
             textSpinner.classList.remove('hidden');
             textPlaceholder.classList.add('hidden');
-            textImageGrid.innerHTML = '';
+            textImage.classList.add('hidden');
 
             try {
                 const payload = {
-                    contents: [{
-                        parts: [{ text: prompt }]
-                    }],
-                    generationConfig: {
-                        responseModalities: ['TEXT', 'IMAGE']
-                    },
+                    instances: { prompt: prompt },
+                    parameters: { "sampleCount": 1 }
                 };
-                
-                const result = await fetchWithBackoff(API_URL, {
+
+                const result = await fetchWithBackoff(TEXT_TO_IMAGE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
-                const part = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-                if (part && part.inlineData && part.inlineData.data) {
-                    const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    const img = document.createElement('img');
-                    img.src = imageUrl;
-                    img.className = "rounded-2xl max-w-full max-h-[300px] object-cover";
-                    img.alt = "Generated Image";
-                    textImageGrid.appendChild(img);
+
+                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                    textImage.src = imageUrl;
+                    textImage.classList.remove('hidden');
                 } else {
-                    textPlaceholder.innerText = "Image generation failed. Please try a different prompt.";
+                    textPlaceholder.innerText = "Could not generate image. Please try a different prompt.";
                     textPlaceholder.classList.remove('hidden');
                     console.error('API response structure is unexpected:', result);
                 }
-                
+
             } catch (error) {
-                console.error('Failed to generate images:', error);
-                textPlaceholder.innerText = "An error occurred during image generation. Please try again later.";
+                console.error('Failed to generate image:', error);
+                textPlaceholder.innerText = "An error occurred. Please try again later.";
                 textPlaceholder.classList.remove('hidden');
             } finally {
                 isGenerating = false;
@@ -309,9 +286,8 @@
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, drawingCanvas.width, drawingCanvas.height);
             descriptionText.innerText = "Description will appear here after analysis...";
-            drawImageGrid.innerHTML = '';
+            drawImage.classList.add('hidden');
             drawPlaceholder.classList.remove('hidden');
-            copyPromptBtn.classList.add('hidden');
         });
         
         // --- Drawing Analyzer & Generator Logic ---
@@ -323,13 +299,13 @@
             drawSpinner.classList.remove('hidden');
             descriptionText.innerText = "Analyzing your drawing...";
             drawPlaceholder.classList.add('hidden');
-            drawImageGrid.innerHTML = '';
-            copyPromptBtn.classList.add('hidden');
+            drawImage.classList.add('hidden');
 
             const imageDataUrl = drawingCanvas.toDataURL('image/png');
             const base64Data = imageDataUrl.split(',')[1];
 
             try {
+                // Step 1: Analyze the drawing
                 const analysisPayload = {
                     contents: [{
                         role: "user",
@@ -340,62 +316,45 @@
                     }],
                 };
 
-                const analysisResult = await fetchWithBackoff(API_URL, {
+                const analysisResult = await fetchWithBackoff(IMAGE_TO_TEXT_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(analysisPayload)
                 });
 
-                let description = null;
-                const textPart = analysisResult?.candidates?.[0]?.content?.parts?.[0];
-                if (textPart && textPart.text) {
-                    description = textPart.text;
-                    descriptionText.innerText = description;
-                    copyPromptBtn.classList.remove('hidden');
-                } else {
-                    console.error('Image analysis failed: No valid description returned.');
-                    descriptionText.innerText = "Could not analyze your drawing. Please try again with a clearer doodle.";
-                    isGenerating = false;
-                    analyzeBtn.disabled = false;
-                    drawSpinner.classList.add('hidden');
-                    return;
+                let description = "Could not generate a description.";
+                const candidate = analysisResult?.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    description = candidate.content.parts[0].text;
                 }
+                descriptionText.innerText = description;
                 
-                descriptionText.innerText = description + "\n\nGenerating new image...";
+                // Step 2: Generate an image from the description
+                descriptionText.innerText += "\n\nGenerating a new image...";
                 
                 const generationPayload = {
-                    contents: [{
-                        parts: [{ text: description }]
-                    }],
-                    generationConfig: {
-                        responseModalities: ['TEXT', 'IMAGE']
-                    },
+                    instances: { prompt: description },
+                    parameters: { "sampleCount": 1 }
                 };
-                
-                const generationResult = await fetchWithBackoff(API_URL, {
+
+                const generationResult = await fetchWithBackoff(TEXT_TO_IMAGE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generationPayload)
                 });
                 
-                const imagePart = generationResult?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-                if (imagePart && imagePart.inlineData && imagePart.inlineData.data) {
-                    const imageUrl = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-                    const img = document.createElement('img');
-                    img.src = imageUrl;
-                    img.className = "rounded-2xl max-w-full max-h-[300px] object-cover";
-                    img.alt = "Generated Image";
-                    drawImageGrid.appendChild(img);
-                    descriptionText.innerText = description;
+                if (generationResult.predictions && generationResult.predictions.length > 0 && generationResult.predictions[0].bytesBase64Encoded) {
+                    const imageUrl = `data:image/png;base64,${generationResult.predictions[0].bytesBase64Encoded}`;
+                    drawImage.src = imageUrl;
+                    drawImage.classList.remove('hidden');
+                    descriptionText.innerText = description; // Final description
                 } else {
-                    console.error('Image generation failed: No valid image returned.');
-                    drawPlaceholder.innerText = "Image generation failed from the description. Please try again.";
+                    drawPlaceholder.innerText = "Could not generate image from description. Please try again.";
                     drawPlaceholder.classList.remove('hidden');
-                    descriptionText.innerText = description;
                 }
 
             } catch (error) {
-                console.error('Failed to analyze and generate images:', error);
+                console.error('Failed to analyze and generate image:', error);
                 descriptionText.innerText = "An error occurred during processing. Please try again.";
                 drawPlaceholder.innerText = "An error occurred. Please try again.";
                 drawPlaceholder.classList.remove('hidden');
@@ -404,27 +363,6 @@
                 analyzeBtn.disabled = false;
                 drawSpinner.classList.add('hidden');
             }
-        });
-
-        // --- Copy Prompt Button Logic ---
-        copyPromptBtn.addEventListener('click', async () => {
-            const textToCopy = descriptionText.innerText.split("\n\n")[0];
-            const originalText = copyPromptBtn.innerText;
-            try {
-                await navigator.clipboard.writeText(textToCopy);
-                copyPromptBtn.innerText = "Copied!";
-            } catch (err) {
-                const tempTextArea = document.createElement('textarea');
-                tempTextArea.value = textToCopy;
-                document.body.appendChild(tempTextArea);
-                tempTextArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(tempTextArea);
-                copyPromptBtn.innerText = "Copied!";
-            }
-            setTimeout(() => {
-                copyPromptBtn.innerText = originalText;
-            }, 2000);
         });
     </script>
 
