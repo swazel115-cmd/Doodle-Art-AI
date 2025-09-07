@@ -185,7 +185,8 @@
 
             const prompt = textPromptInput.value.trim();
             if (!prompt) {
-                textPromptInput.placeholder = "Please enter a prompt!";
+                textPlaceholder.innerText = "Please enter a prompt to generate images.";
+                textPlaceholder.classList.remove('hidden');
                 return;
             }
 
@@ -217,14 +218,14 @@
                         textImageGrid.appendChild(img);
                     });
                 } else {
-                    textPlaceholder.innerText = "Could not generate images. Please try a different prompt.";
+                    textPlaceholder.innerText = "Image generation failed. The model did not return any images for that prompt. Please try a different prompt.";
                     textPlaceholder.classList.remove('hidden');
                     console.error('API response structure is unexpected:', result);
                 }
                 
             } catch (error) {
                 console.error('Failed to generate images:', error);
-                textPlaceholder.innerText = "An error occurred. Please try again later.";
+                textPlaceholder.innerText = "An error occurred during image generation. Please try again later.";
                 textPlaceholder.classList.remove('hidden');
             } finally {
                 isGenerating = false;
@@ -346,15 +347,22 @@
                     body: JSON.stringify(analysisPayload)
                 });
 
-                let description = "Could not generate a description.";
+                let description = null;
                 const candidate = analysisResult?.candidates?.[0];
                 if (candidate && candidate.content?.parts?.[0]?.text) {
                     description = candidate.content.parts[0].text;
+                    descriptionText.innerText = description;
+                    copyPromptBtn.classList.remove('hidden');
+                } else {
+                    descriptionText.innerText = "Could not analyze your drawing. Please try again with a clearer doodle.";
+                    isGenerating = false;
+                    analyzeBtn.disabled = false;
+                    drawSpinner.classList.add('hidden');
+                    return;
                 }
-                descriptionText.innerText = description;
                 
                 // Step 2: Generate an image from the description.
-                descriptionText.innerText += "\n\nGenerating new image...";
+                descriptionText.innerText = description + "\n\nGenerating new image...";
                 
                 const generationPayload = {
                     instances: { prompt: description },
@@ -375,10 +383,10 @@
                     img.alt = "Generated Image";
                     drawImageGrid.appendChild(img);
                     descriptionText.innerText = description; // Final description
-                    copyPromptBtn.classList.remove('hidden');
                 } else {
-                    drawPlaceholder.innerText = "Could not generate image from description. Please try again.";
+                    drawPlaceholder.innerText = "Image generation failed from the description. Please try again.";
                     drawPlaceholder.classList.remove('hidden');
+                    descriptionText.innerText = description; // Show the description even if image fails
                 }
 
             } catch (error) {
@@ -395,7 +403,7 @@
 
         // --- Copy Prompt Button Logic ---
         copyPromptBtn.addEventListener('click', async () => {
-            const textToCopy = descriptionText.innerText;
+            const textToCopy = descriptionText.innerText.split("\n\n")[0]; // Only copy the initial description
             const originalText = copyPromptBtn.innerText;
             try {
                 // Use the modern clipboard API
@@ -419,4 +427,3 @@
 
 </body>
 </html>
-
