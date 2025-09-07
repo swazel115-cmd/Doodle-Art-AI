@@ -138,10 +138,10 @@
         const drawPlaceholder = document.getElementById('drawPlaceholder');
         const downloadDrawBtn = document.getElementById('downloadDrawBtn');
 
-        const API_KEY = "AIzaSyDef8QFiN7TI8P-uZNBd8lDyYRtjOfvMD8"; // This will be provided by the runtime
-        const TEXT_TO_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
-        const IMAGE_TO_TEXT_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
-        const GENERATE_IMAGE_MODEL = "imagen-3.0-generate-002";
+        const API_KEY = ""; // This will be provided by the runtime
+        const GENERATE_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${API_KEY}`;
+        const ANALYZE_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        const GENERATE_IMAGE_MODEL = "gemini-2.5-flash-image-preview";
         const ANALYZE_IMAGE_MODEL = "gemini-2.5-flash-preview-05-20";
 
         // --- Utility Function for Exponential Backoff ---
@@ -204,18 +204,24 @@
 
             try {
                 const payload = {
-                    instances: { prompt: prompt },
-                    parameters: { "sampleCount": 1 }
+                    contents: [{
+                        parts: [{ text: prompt }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE']
+                    },
+                    model: GENERATE_IMAGE_MODEL
                 };
 
-                const result = await fetchWithBackoff(TEXT_TO_IMAGE_URL, {
+                const result = await fetchWithBackoff(GENERATE_IMAGE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
-                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                const base64Data = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                if (base64Data) {
+                    const imageUrl = `data:image/png;base64,${base64Data}`;
                     textImage.src = imageUrl;
                     textImage.classList.remove('hidden');
                     downloadTextBtn.classList.remove('hidden');
@@ -332,7 +338,7 @@
             const base64Data = imageDataUrl.split(',')[1];
 
             try {
-                // Step 1: Analyze the drawing
+                // Step 1: Analyze the drawing with gemini-2.5-flash-preview-05-20
                 const analysisPayload = {
                     contents: [{
                         role: "user",
@@ -343,7 +349,7 @@
                     }],
                 };
 
-                const analysisResult = await fetchWithBackoff(IMAGE_TO_TEXT_URL, {
+                const analysisResult = await fetchWithBackoff(ANALYZE_IMAGE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(analysisPayload)
@@ -356,22 +362,29 @@
                 }
                 descriptionText.innerText = description;
                 
-                // Step 2: Generate an image from the description
+                // Step 2: Generate an image from the description with gemini-2.5-flash-image-preview
                 descriptionText.innerText += "\n\nGenerating a new image...";
                 
                 const generationPayload = {
-                    instances: { prompt: description },
-                    parameters: { "sampleCount": 1 }
+                    contents: [{
+                        parts: [{ text: description }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE']
+                    },
+                    model: GENERATE_IMAGE_MODEL
                 };
 
-                const generationResult = await fetchWithBackoff(TEXT_TO_IMAGE_URL, {
+                const generationResult = await fetchWithBackoff(GENERATE_IMAGE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generationPayload)
                 });
                 
-                if (generationResult.predictions && generationResult.predictions.length > 0 && generationResult.predictions[0].bytesBase64Encoded) {
-                    const imageUrl = `data:image/png;base64,${generationResult.predictions[0].bytesBase64Encoded}`;
+                const generatedBase64Data = generationResult?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+
+                if (generatedBase64Data) {
+                    const imageUrl = `data:image/png;base64,${generatedBase64Data}`;
                     drawImage.src = imageUrl;
                     drawImage.classList.remove('hidden');
                     downloadDrawBtn.classList.remove('hidden');
