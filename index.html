@@ -44,7 +44,7 @@
             border: 2px solid #e5e7eb;
             cursor: crosshair;
             background-color: white;
-            touch-action: none; /* Prevents scrolling on touch */
+            touch-action: none;
         }
     </style>
 </head>
@@ -79,7 +79,7 @@
         <!-- Section 2: Drawing Analyzer and Generator -->
         <div class="card p-6 md:p-10 flex flex-col items-center">
             <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Generate from Your Drawing</h2>
-            <p class="text-gray-600 mb-4 text-center">Draw something on the canvas below, and the AI will analyze it and create a new image.</p>
+            <p class="text-lg text-gray-600 mb-4 text-center">Draw something on the canvas below, and the AI will analyze it and create a new image.</p>
             
             <div class="w-full max-w-4xl flex flex-col lg:flex-row items-center lg:items-start gap-8">
                 <!-- Drawing Canvas -->
@@ -114,12 +114,10 @@
     </div>
 
     <script>
-        // Use a single variable to check if a request is in progress
         let isGenerating = false;
         
-        // Configuration for exponential backoff
         const MAX_RETRIES = 3;
-        const INITIAL_DELAY = 1000; // 1 second
+        const INITIAL_DELAY = 1000;
         
         const textPromptInput = document.getElementById('promptInput');
         const generateBtn = document.getElementById('generateBtn');
@@ -138,13 +136,14 @@
         const drawPlaceholder = document.getElementById('drawPlaceholder');
         const downloadDrawBtn = document.getElementById('downloadDrawBtn');
 
-        const API_KEY = ""; // This will be provided by the runtime
-        const GENERATE_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${API_KEY}`;
+        const API_KEY = "AIzaSyDef8QFiN7TI8P-uZNBd8lDyYRtjOfvMD8";
+        const GENERATE_TEXT_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
         const ANALYZE_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
-        const GENERATE_IMAGE_MODEL = "gemini-2.5-flash-image-preview";
+        const GENERATE_DRAWING_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${API_KEY}`;
+        const GENERATE_TEXT_IMAGE_MODEL = "imagen-3.0-generate-002";
         const ANALYZE_IMAGE_MODEL = "gemini-2.5-flash-preview-05-20";
+        const GENERATE_DRAWING_IMAGE_MODEL = "gemini-2.5-flash-image-preview";
 
-        // --- Utility Function for Exponential Backoff ---
         async function fetchWithBackoff(url, options, retries = MAX_RETRIES, delay = INITIAL_DELAY) {
             try {
                 const response = await fetch(url, options);
@@ -166,7 +165,6 @@
             }
         }
 
-        // --- Utility function to download an image ---
         function downloadImage(imageElement, filename) {
             const link = document.createElement('a');
             link.href = imageElement.src;
@@ -176,7 +174,6 @@
             document.body.removeChild(link);
         }
 
-        // --- Event listeners for download buttons ---
         downloadTextBtn.addEventListener('click', () => {
             downloadImage(textImage, 'ai-generated-text-image.png');
         });
@@ -184,8 +181,6 @@
             downloadImage(drawImage, 'ai-generated-drawing-image.png');
         });
 
-
-        // --- Text-to-Image Logic ---
         generateBtn.addEventListener('click', async () => {
             if (isGenerating) return;
 
@@ -203,25 +198,19 @@
             downloadTextBtn.classList.add('hidden');
 
             try {
-                const payload = {
-                    contents: [{
-                        parts: [{ text: prompt }]
-                    }],
-                    generationConfig: {
-                        responseModalities: ['TEXT', 'IMAGE']
-                    },
-                    model: GENERATE_IMAGE_MODEL
+                const payload = { 
+                    instances: [{ prompt: prompt }], 
+                    parameters: { "sampleCount": 1} 
                 };
-
-                const result = await fetchWithBackoff(GENERATE_IMAGE_URL, {
+                
+                const result = await fetchWithBackoff(GENERATE_TEXT_IMAGE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-
-                const base64Data = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-                if (base64Data) {
-                    const imageUrl = `data:image/png;base64,${base64Data}`;
+                
+                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
                     textImage.src = imageUrl;
                     textImage.classList.remove('hidden');
                     downloadTextBtn.classList.remove('hidden');
@@ -242,7 +231,6 @@
             }
         });
 
-        // --- Drawing Canvas Logic ---
         let isDrawing = false;
         
         function getPos(e) {
@@ -322,7 +310,6 @@
             downloadDrawBtn.classList.add('hidden');
         });
         
-        // --- Drawing Analyzer & Generator Logic ---
         analyzeBtn.addEventListener('click', async () => {
             if (isGenerating) return;
 
@@ -338,7 +325,6 @@
             const base64Data = imageDataUrl.split(',')[1];
 
             try {
-                // Step 1: Analyze the drawing with gemini-2.5-flash-preview-05-20
                 const analysisPayload = {
                     contents: [{
                         role: "user",
@@ -362,7 +348,6 @@
                 }
                 descriptionText.innerText = description;
                 
-                // Step 2: Generate an image from the description with gemini-2.5-flash-image-preview
                 descriptionText.innerText += "\n\nGenerating a new image...";
                 
                 const generationPayload = {
@@ -372,10 +357,10 @@
                     generationConfig: {
                         responseModalities: ['TEXT', 'IMAGE']
                     },
-                    model: GENERATE_IMAGE_MODEL
+                    model: GENERATE_DRAWING_IMAGE_MODEL
                 };
 
-                const generationResult = await fetchWithBackoff(GENERATE_IMAGE_URL, {
+                const generationResult = await fetchWithBackoff(GENERATE_DRAWING_IMAGE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(generationPayload)
@@ -388,7 +373,7 @@
                     drawImage.src = imageUrl;
                     drawImage.classList.remove('hidden');
                     downloadDrawBtn.classList.remove('hidden');
-                    descriptionText.innerText = description; // Final description
+                    descriptionText.innerText = description;
                 } else {
                     drawPlaceholder.innerText = "Could not generate image from description. Please try again.";
                     drawPlaceholder.classList.remove('hidden');
